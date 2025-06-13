@@ -59,36 +59,30 @@ class GameRenderer:
         self._render_ui(game_state)
         
     def _render_ui(self, game_state):
-        for i, player in enumerate(game_state.players):
-            if i == 0:
+        for player in game_state.players:
+            if player.player_id == 0:
                 color = (100, 100, 255) if player.is_alive else (100, 100, 100)
                 pos = (10, 10)
-                health_status = f"{player.health}" if player.is_alive else "DEAD"
-                respawn_info = ""
-                
-                if player.is_respawning:
-                    respawn_time = player.get_respawn_time_remaining() // 1000 + 1
-                    health_status = "DEAD"
-                    respawn_info = f"Respawning in {respawn_time}s"
-                
-                text = f"Blue - Score: {player.score} | HP: {health_status}"
-                health_surface = self.fonts['medium'].render(text, True, color)
-                
-            elif i == 1:
+                team_name = "Blue"
+            elif player.player_id == 1:
                 color = (255, 100, 100) if player.is_alive else (100, 100, 100)
-                health_status = f"{player.health}" if player.is_alive else "DEAD"
-                respawn_info = ""
-                
-                if player.is_respawning:
-                    respawn_time = player.get_respawn_time_remaining() // 1000 + 1
-                    health_status = "DEAD"
-                    respawn_info = f"Respawning in {respawn_time}s"
-                
-                text = f"Red - Score: {player.score} | HP: {health_status}"
-                health_surface = self.fonts['medium'].render(text, True, color)
-                pos = (SCREEN_WIDTH - health_surface.get_width() - 10, 10)
+                team_name = "Red"
             else:
                 continue
+                
+            health_status = f"{player.health}" if player.is_alive else "DEAD"
+            respawn_info = ""
+            
+            if player.is_respawning:
+                respawn_time = player.get_respawn_time_remaining() // 1000 + 1
+                health_status = "DEAD"
+                respawn_info = f"Respawning in {respawn_time}s"
+            
+            text = f"{team_name} - Score: {player.score} | HP: {health_status}"
+            health_surface = self.fonts['medium'].render(text, True, color)
+            
+            if player.player_id == 1:
+                pos = (SCREEN_WIDTH - health_surface.get_width() - 10, 10)
             
             self.screen.blit(health_surface, pos)
             

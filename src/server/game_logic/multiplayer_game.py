@@ -40,16 +40,20 @@ class MultiplayerGame:
     def _initialize_players(self):
         blue_spawn = self.game_state.game_map.get_spawn_position(PLAYER_BLUE)
         red_spawn = self.game_state.game_map.get_spawn_position(PLAYER_RED)
+        
         if self.mode == 'host':
+            # Host is always blue (player_id=0)
             self.local_player = Player(blue_spawn[0], blue_spawn[1], "player_blue.png", PLAYER_BLUE)
             self.remote_player = Player(red_spawn[0], red_spawn[1], "player_red.png", PLAYER_RED)
             self.local_player_id = PLAYER_BLUE
             self.remote_player_id = PLAYER_RED
         else:
-            self.local_player = Player(red_spawn[0], red_spawn[1], "player_blue.png", PLAYER_RED)
-            self.remote_player = Player(blue_spawn[0], blue_spawn[1], "player_red.png", PLAYER_BLUE)
+            # Client is always red (player_id=1)
+            self.local_player = Player(red_spawn[0], red_spawn[1], "player_red.png", PLAYER_RED)
+            self.remote_player = Player(blue_spawn[0], blue_spawn[1], "player_blue.png", PLAYER_BLUE)
             self.local_player_id = PLAYER_RED
             self.remote_player_id = PLAYER_BLUE
+            
         self.game_state.add_player(self.local_player)
         self.game_state.add_player(self.remote_player)
         if self.interpolation_enabled:
