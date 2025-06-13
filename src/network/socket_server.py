@@ -52,22 +52,32 @@ class GameServer:
     
     def _encode_ip_to_code(self, ip_address, port):
         try:
+            print(f"Encoding IP: {ip_address}:{port}")
             if ip_address in ['localhost', '127.0.0.1']:
+                print("Using LOCL for localhost")
                 return 'LOCL'
             parts = ip_address.split('.')
             if len(parts) != 4:
+                print("Invalid IP format, using LOCL")
                 return 'LOCL'
-            ip_num = 0
-            for part in parts:
-                ip_num = (ip_num << 8) + int(part)
-            combined = (ip_num ^ port) & 0xFFFFFF
+            
+            third_octet = int(parts[2])
+            fourth_octet = int(parts[3])
+            
+            combined = (third_octet << 16) | (fourth_octet << 8) | (port & 0xFF)
+            
+            print(f"Combined value: {combined}")
+            
             chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             code = ""
+            temp = combined
             for _ in range(4):
-                code = chars[combined % 36] + code
-                combined //= 36
+                code = chars[temp % 36] + code
+                temp //= 36
+            print(f"Generated code: {code}")
             return code
-        except Exception:
+        except Exception as e:
+            print(f"Error encoding IP: {e}")
             return 'LOCL'
     def start(self):
         try:

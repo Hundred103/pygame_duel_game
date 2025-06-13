@@ -173,13 +173,11 @@ class MainMenu:
         host, port = self._find_server_in_registry(self.join_code_input)
         
         if host is None:
-            # Try to decode IP from the 4-character code
             decoded_ip, decoded_port = self._decode_ip_from_code(self.join_code_input)
             
             if decoded_ip:
                 host, port = decoded_ip, decoded_port
             else:
-                # Fallback to hardcoded demo servers
                 code_servers = {
                     'TEST': ('localhost', 12345),
                     'DEMO': ('localhost', 12346),
@@ -229,29 +227,24 @@ class MainMenu:
     def _encode_ip_to_code(self, ip_address, port):
         """Encode IP address and port into a 4-character code"""
         try:
-            # Special case for localhost - use 'LOCL'
             if ip_address in ['localhost', '127.0.0.1']:
                 return 'LOCL'
             
-            # Parse IP address
             parts = ip_address.split('.')
             if len(parts) != 4:
                 return None
                 
-            # Convert IP to a single number
-            ip_num = 0
-            for part in parts:
-                ip_num = (ip_num << 8) + int(part)
+            third_octet = int(parts[2])
+            fourth_octet = int(parts[3])
             
-            # Simple hash combining IP and port
-            combined = (ip_num ^ port) & 0xFFFFFF  # 24 bits
+            combined = (third_octet << 16) | (fourth_octet << 8) | (port & 0xFF)
             
-            # Convert to base 36 (0-9, A-Z) for 4 characters
             chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             code = ""
+            temp = combined
             for _ in range(4):
-                code = chars[combined % 36] + code
-                combined //= 36
+                code = chars[temp % 36] + code
+                temp //= 36
                 
             return code
             
@@ -261,48 +254,51 @@ class MainMenu:
     def _decode_ip_from_code(self, code):
         """Decode 4-character code back to IP address and port"""
         try:
-            # Special case for localhost
+            print(f"Decoding code: {code}")
+            
             if code == 'LOCL':
+                print("Code is LOCL, returning localhost")
                 return 'localhost', 12345
-                
-            # Convert from base 36
+
             chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             combined = 0
             for char in code:
                 if char not in chars:
+                    print(f"Invalid character in code: {char}")
                     return None, None
                 combined = combined * 36 + chars.index(char)
             
-            # Try common LAN IP ranges with the decoded hash
-            lan_ranges = [
-                "192.168.1.",   # Most common home router range
-                "192.168.0.",   # Second most common
-                "10.0.0.",      # Corporate networks
-                "172.16.0.",    # Less common but valid
-                "192.168.2.",   # Another common range
-                "192.168.3.",   # Another common range
+            print(f"Decoded combined: {combined}")
+            
+            port_part = combined & 0xFF
+            fourth_octet = (combined >> 8) & 0xFF
+            third_octet = (combined >> 16) & 0xFF
+            
+            print(f"Extracted - third: {third_octet}, fourth: {fourth_octet}, port_part: {port_part}")
+            
+            # Try common first two octets for networks
+            first_two_octets = [
+                "198.168",
+                "192.168",
+                "10.0",
+                "172.16",
             ]
             
-            # Try different ports
+            # Try common ports
             common_ports = [12345, 12346, 12347, 12348, 12349]
             
-            for base_ip in lan_ranges:
-                for last_octet in range(1, 255):  # Skip 0 and 255
-                    test_ip = f"{base_ip}{last_octet}"
-                    for port in common_ports:
-                        # Calculate what the hash would be for this IP/port combo
-                        parts = test_ip.split('.')
-                        ip_num = 0
-                        for part in parts:
-                            ip_num = (ip_num << 8) + int(part)
-                        test_hash = (ip_num ^ port) & 0xFFFFFF
-                        
-                        if test_hash == combined:
-                            return test_ip, port
+            for prefix in first_two_octets:
+                test_ip = f"{prefix}.{third_octet}.{fourth_octet}"
+                for port in common_ports:
+                    if port_part == (port & 0xFF):
+                        print(f"Found matching IP: {test_ip}:{port}")
+                        return test_ip, port
             
+            print(f"No matching IP found for combined: {combined}")
             return None, None
             
-        except Exception:
+        except Exception as e:
+            print(f"Error decoding IP: {e}")
             return None, None
         
     def _try_connect(self, host, port):
@@ -310,7 +306,6 @@ class MainMenu:
             print(f"Attempting to connect to {host}:{port}")
             self.client = GameClient()
             if self.client.connect(host, port):
-                # Give more time for connection to stabilize
                 time.sleep(1.0)
                 if self.client.connected:
                     print(f"Successfully connected to {host}:{port}")
