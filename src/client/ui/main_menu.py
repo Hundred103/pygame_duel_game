@@ -27,8 +27,8 @@ class MainMenu:
         self.countdown_duration = 3.0
         
         self.known_servers = {
-            'TEST': ('localhost', 12345),
-            'DEMO': ('localhost', 12346)
+            'TEST': ('127.0.0.1', 12345),
+            'DEMO': ('127.0.0.1', 12346) 
         }
         
     def handle_event(self, event):
@@ -143,9 +143,12 @@ class MainMenu:
             self.client = GameClient()
 
             server_info = self.server.get_server_info()
-            connect_host = server_info['host'] if server_info['host'] != '0.0.0.0' else 'localhost'
+            connect_host = '127.0.0.1' if server_info['host'] in ['0.0.0.0', 'localhost', '127.0.0.1'] else server_info['host']
             
-            if self.client.connect(connect_host, self.server.port):
+            connect_port = 12345 if server_info['code'] == 'LOCALL' else server_info['port']
+            print(f"Connecting to host as client: {connect_host}:{connect_port}")
+            
+            if self.client.connect(connect_host, connect_port):
                 self.client.register_handler('connection_lost', self._handle_host_connection_lost)
                 self.client.register_handler('connection_check_ok', self._handle_connection_check_ok)
                 self.client.register_handler('connection_check_failed', self._handle_connection_check_failed)
@@ -176,8 +179,8 @@ class MainMenu:
             host, port = decoded_ip, decoded_port
         else:
             code_servers = {
-                'TEST': ('localhost', 12345),
-                'DEMO': ('localhost', 12346),
+                'TEST': ('127.0.0.1', 12345),
+                'DEMO': ('127.0.0.1', 12346), 
             }
             
             if self.join_code_input in code_servers:
@@ -200,6 +203,7 @@ class MainMenu:
         """Encode IP and port into 6-character code - SYMMETRICAL"""
         try:
             if ip_address in ['localhost', '127.0.0.1']:
+                # Always use LOCALL for localhost
                 return 'LOCALL'
             
             parts = ip_address.split('.')
@@ -234,8 +238,8 @@ class MainMenu:
             print(f"Decoding code: {code}")
             
             if code == 'LOCALL':
-                print("Code is LOCALL, returning localhost")
-                return 'localhost', 12345
+                print("Code is LOCALL, returning 127.0.0.1:12345")
+                return '127.0.0.1', 12345
 
             chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             combined = 0

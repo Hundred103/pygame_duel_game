@@ -27,10 +27,7 @@ class GameClient:
             self.running = True
             self.connected = False
             
-            if host in ['localhost', '127.0.0.1']:
-                bind_host = 'localhost'
-            else:
-                bind_host = '0.0.0.0'
+            bind_host = '0.0.0.0'
             
             self.socket.bind((bind_host, 0))
             client_port = self.socket.getsockname()[1]
@@ -72,9 +69,16 @@ class GameClient:
                 print(f"Client received data from {address}: {data}")
                 
                 def normalize_address(addr):
-                    return '127.0.0.1' if addr in ['localhost', '127.0.0.1'] else addr
+                    if addr in ['localhost', '127.0.0.1']:
+                        return '127.0.0.1'
+                    return addr
                 
-                if (normalize_address(address[0]) == normalize_address(self.server_address[0]) and
+                server_addr = normalize_address(self.server_address[0])
+                from_addr = normalize_address(address[0])
+                
+                if ((from_addr == server_addr or 
+                     (server_addr == 'localhost' and from_addr == '127.0.0.1') or
+                     (server_addr == '127.0.0.1' and from_addr == 'localhost')) and
                     address[1] == self.server_address[1]):
                     try:
                         message = json.loads(data.decode('utf-8'))
@@ -145,7 +149,12 @@ class GameClient:
         if self.socket and self.server_address:
             try:
                 data = json.dumps(message).encode('utf-8')
-                bytes_sent = self.socket.sendto(data, self.server_address)
+                
+                send_address = list(self.server_address)
+                if send_address[0] in ['localhost', '127.0.0.1']:
+                    send_address[0] = '127.0.0.1'
+                
+                bytes_sent = self.socket.sendto(data, tuple(send_address))
                 print(f"Client sent {bytes_sent} bytes to server: {message.get('type', 'unknown')}")
                 return True
             except Exception as e:

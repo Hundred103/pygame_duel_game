@@ -8,12 +8,10 @@ import os
 
 class GameServer:
     def __init__(self, host=None, port=0):
-        if host is None:
-            local_ip = self._get_local_ip_for_binding()
-            self.host = '0.0.0.0' if local_ip and local_ip != '127.0.0.1' else 'localhost'
-        else:
-            self.host = host
+        self.host = '0.0.0.0'
         self.port = port
+        
+        self.is_localhost_server = False
         self.socket = None
         self.running = False
         self.clients = {}
@@ -34,10 +32,11 @@ class GameServer:
         
     def _generate_server_code(self):
         actual_ip = self._get_local_ip()
-        if actual_ip and actual_ip != '127.0.0.1':
-            return self._encode_ip_to_code(actual_ip, self.port or 12345)
+        if actual_ip in ['localhost', '127.0.0.1']:
+            self.is_localhost_server = True
+            return 'LOCALL'
         else:
-            return 'LOCL'
+            return self._encode_ip_to_code(actual_ip, self.port)
     
     def _get_local_ip(self):
         try:
@@ -54,11 +53,8 @@ class GameServer:
         try:
             print(f"Encoding IP: {ip_address}:{port}")
             
-            if ip_address == 'localhost':
-                print("Using LOCALL for localhost")
-                return 'LOCALL'
-            if ip_address == '127.0.0.1':
-                print("Using LOCALL for 127.0.0.1")
+            if ip_address == 'localhost' or ip_address == '127.0.0.1':
+                print(f"Using LOCALL for {ip_address}:{port}")
                 return 'LOCALL'
             
             parts = ip_address.split('.')
@@ -91,8 +87,16 @@ class GameServer:
             return 'LOCALL'
     def start(self):
         try:
+            local_ip = self._get_local_ip()
+            self.is_localhost_server = (local_ip in ['localhost', '127.0.0.1'])
+            
+            if self.is_localhost_server and not self.port:
+                self.port = 12345
+                print("Localhost-only server - using port 12345")
+                
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
             self.socket.bind((self.host, self.port))
+            
             if self.port == 0:
                 self.port = self.socket.getsockname()[1]
             self.server_code = self._generate_server_code()
@@ -216,7 +220,21 @@ class GameServer:
         
     def get_server_info(self):
         actual_ip = self._get_local_ip()
-        return {'host': actual_ip if actual_ip != 'localhost' else self.host, 'port': self.port, 'code': self.server_code, 'clients': len(self.clients), 'ready': self.players_ready}
+        
+        # Create the info dict with the actual port and IP first
+        info = {
+            'host': actual_ip if actual_ip != 'localhost' else self.host,
+            'port': self.port,
+            'code': self.server_code,
+            'clients': len(self.clients),
+            'ready': self.players_ready
+        }
+        
+        # If this is a localhost server (LOCALL), override the port to report
+        if self.server_code == 'LOCALL':
+            info['port'] = 12345
+        
+        return info
         
     def is_game_ready(self):
         return len(self.clients) >= 2
