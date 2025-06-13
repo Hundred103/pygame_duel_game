@@ -21,7 +21,6 @@ class GameServer:
         self.game_state = {'players': {}, 'projectiles': [], 'game_status': 'waiting'}
         self.server_code = None
         self.players_ready = False
-        self.registry_file = "/tmp/duel_game_servers.json"
         
     def _get_local_ip_for_binding(self):
         try:
@@ -51,34 +50,45 @@ class GameServer:
             return 'localhost'
     
     def _encode_ip_to_code(self, ip_address, port):
+        """Encode IP and port into 6-character code - SYMMETRICAL"""
         try:
             print(f"Encoding IP: {ip_address}:{port}")
-            if ip_address in ['localhost', '127.0.0.1']:
-                print("Using LOCL for localhost")
-                return 'LOCL'
+            
+            if ip_address == 'localhost':
+                print("Using LOCALL for localhost")
+                return 'LOCALL'
+            if ip_address == '127.0.0.1':
+                print("Using LOCALL for 127.0.0.1")
+                return 'LOCALL'
+            
             parts = ip_address.split('.')
             if len(parts) != 4:
-                print("Invalid IP format, using LOCL")
-                return 'LOCL'
+                print("Invalid IP format, using LOCALL")
+                return 'LOCALL'
             
             third_octet = int(parts[2])
             fourth_octet = int(parts[3])
             
-            combined = (third_octet << 16) | (fourth_octet << 8) | (port & 0xFF)
+            port_encoded = port
             
-            print(f"Combined value: {combined}")
+            combined = (third_octet << 24) | (fourth_octet << 16) | port_encoded
             
+            if combined >= 36**6:
+                return 'LOCALL'
+
             chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             code = ""
             temp = combined
-            for _ in range(4):
+            for _ in range(6):
                 code = chars[temp % 36] + code
                 temp //= 36
+            
             print(f"Generated code: {code}")
             return code
+            
         except Exception as e:
             print(f"Error encoding IP: {e}")
-            return 'LOCL'
+            return 'LOCALL'
     def start(self):
         try:
             self.socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -89,7 +99,6 @@ class GameServer:
             self.running = True
             print(f"UDP Game server started on {self.host}:{self.port}")
             print(f"Server code: {self.server_code}")
-            self._register_server()
             self._listen_for_messages()
         except Exception as e:
             print(f"Failed to start server: {e}")
@@ -198,43 +207,12 @@ class GameServer:
             
     def stop(self):
         self.running = False
-        self._unregister_server()
         if self.socket:
             try:
                 self.socket.close()
             except:
                 pass
         print("UDP Server stopped")
-    def _register_server(self):
-        try:
-            registry = {}
-            if os.path.exists(self.registry_file):
-                try:
-                    with open(self.registry_file, 'r') as f:
-                        registry = json.load(f)
-                except:
-                    registry = {}
-            actual_ip = self._get_local_ip()
-            registry_host = actual_ip if actual_ip != 'localhost' else 'localhost'
-            registry[self.server_code] = {'host': registry_host, 'port': self.port, 'timestamp': time.time()}
-            os.makedirs(os.path.dirname(self.registry_file), exist_ok=True)
-            with open(self.registry_file, 'w') as f:
-                json.dump(registry, f)
-            print(f"Server registered with code {self.server_code} on {registry_host}:{self.port}")
-        except Exception as e:
-            print(f"Failed to register server: {e}")
-            
-    def _unregister_server(self):
-        try:
-            if os.path.exists(self.registry_file):
-                with open(self.registry_file, 'r') as f:
-                    registry = json.load(f)
-                if self.server_code in registry:
-                    del registry[self.server_code]
-                    with open(self.registry_file, 'w') as f:
-                        json.dump(registry, f)
-        except Exception as e:
-            print(f"Failed to unregister server: {e}")
         
     def get_server_info(self):
         actual_ip = self._get_local_ip()

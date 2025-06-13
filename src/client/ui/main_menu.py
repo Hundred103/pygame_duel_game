@@ -91,14 +91,14 @@ class MainMenu:
                 self.state = 'main'
                 self.error_message = ""
             elif event.key == pygame.K_RETURN:
-                if len(self.join_code_input) == 4:
+                if len(self.join_code_input) == 6:
                     return self._connect_to_server()
                 else:
-                    self.error_message = "Code must be 4 characters"
+                    self.error_message = "Code must be 6 characters"
             elif event.key == pygame.K_BACKSPACE:
                 self.join_code_input = self.join_code_input[:-1]
             else:
-                if len(self.join_code_input) < 4 and event.unicode.isalnum():
+                if len(self.join_code_input) < 6 and event.unicode.isalnum():
                     self.join_code_input += event.unicode.upper()
         return None
         
@@ -170,25 +170,22 @@ class MainMenu:
         self.state = 'connecting'
         self.error_message = ""
         
-        host, port = self._find_server_in_registry(self.join_code_input)
+        decoded_ip, decoded_port = self._decode_ip_from_code(self.join_code_input)
         
-        if host is None:
-            decoded_ip, decoded_port = self._decode_ip_from_code(self.join_code_input)
+        if decoded_ip:
+            host, port = decoded_ip, decoded_port
+        else:
+            code_servers = {
+                'TEST': ('localhost', 12345),
+                'DEMO': ('localhost', 12346),
+            }
             
-            if decoded_ip:
-                host, port = decoded_ip, decoded_port
+            if self.join_code_input in code_servers:
+                host, port = code_servers[self.join_code_input]
             else:
-                code_servers = {
-                    'TEST': ('localhost', 12345),
-                    'DEMO': ('localhost', 12346),
-                }
-                
-                if self.join_code_input in code_servers:
-                    host, port = code_servers[self.join_code_input]
-                else:
-                    self.error_message = f"Server with code '{self.join_code_input}' not found"
-                    self.state = 'join_input'
-                    return None
+                self.error_message = f"Server with code '{self.join_code_input}' not found"
+                self.state = 'join_input'
+                return None
         
         connect_thread = threading.Thread(
             target=self._try_connect, 
@@ -199,36 +196,11 @@ class MainMenu:
         
         return None
         
-    def _find_server_in_registry(self, server_code):
-        try:
-            import json
-            import os
-            import time
-            
-            registry_file = "/tmp/duel_game_servers.json"
-            
-            if not os.path.exists(registry_file):
-                return None, None
-                
-            with open(registry_file, 'r') as f:
-                registry = json.load(f)
-                
-            if server_code in registry:
-                server_info = registry[server_code]
-                
-                if time.time() - server_info.get('timestamp', 0) < 300:
-                    return server_info['host'], server_info['port']
-                    
-        except Exception:
-            pass
-            
-        return None, None
-        
     def _encode_ip_to_code(self, ip_address, port):
-        """Encode IP address and port into a 4-character code"""
+        """Encode IP and port into 6-character code - SYMMETRICAL"""
         try:
             if ip_address in ['localhost', '127.0.0.1']:
-                return 'LOCL'
+                return 'LOCALL'
             
             parts = ip_address.split('.')
             if len(parts) != 4:
@@ -237,12 +209,17 @@ class MainMenu:
             third_octet = int(parts[2])
             fourth_octet = int(parts[3])
             
-            combined = (third_octet << 16) | (fourth_octet << 8) | (port & 0xFF)
+            port_encoded = port
+            
+            combined = (third_octet << 24) | (fourth_octet << 16) | port_encoded
+            
+            if combined >= 36**6:
+                return None
             
             chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             code = ""
             temp = combined
-            for _ in range(4):
+            for _ in range(6):
                 code = chars[temp % 36] + code
                 temp //= 36
                 
@@ -252,53 +229,33 @@ class MainMenu:
             return None
     
     def _decode_ip_from_code(self, code):
-        """Decode 4-character code back to IP address and port"""
+        """Decode 6-character code back to IP and port - SYMMETRICAL"""
         try:
             print(f"Decoding code: {code}")
             
-            if code == 'LOCL':
-                print("Code is LOCL, returning localhost")
+            if code == 'LOCALL':
+                print("Code is LOCALL, returning localhost")
                 return 'localhost', 12345
 
             chars = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZ"
             combined = 0
             for char in code:
                 if char not in chars:
-                    print(f"Invalid character in code: {char}")
+                    print(f"Invalid character: {char}")
                     return None, None
                 combined = combined * 36 + chars.index(char)
             
-            print(f"Decoded combined: {combined}")
+            port = combined & 0xFFFF
+            fourth_octet = (combined >> 16) & 0xFF
+            third_octet = (combined >> 24) & 0xFF
             
-            port_part = combined & 0xFF
-            fourth_octet = (combined >> 8) & 0xFF
-            third_octet = (combined >> 16) & 0xFF
+            ip = f"192.168.{third_octet}.{fourth_octet}"
             
-            print(f"Extracted - third: {third_octet}, fourth: {fourth_octet}, port_part: {port_part}")
-            
-            # Try common first two octets for networks
-            first_two_octets = [
-                "198.168",
-                "192.168",
-                "10.0",
-                "172.16",
-            ]
-            
-            # Try common ports
-            common_ports = [12345, 12346, 12347, 12348, 12349]
-            
-            for prefix in first_two_octets:
-                test_ip = f"{prefix}.{third_octet}.{fourth_octet}"
-                for port in common_ports:
-                    if port_part == (port & 0xFF):
-                        print(f"Found matching IP: {test_ip}:{port}")
-                        return test_ip, port
-            
-            print(f"No matching IP found for combined: {combined}")
-            return None, None
+            print(f"DEBUG: Decoded IP={ip} Socket={ip}:{port}")
+            return ip, port
             
         except Exception as e:
-            print(f"Error decoding IP: {e}")
+            print(f"Error decoding: {e}")
             return None, None
         
     def _try_connect(self, host, port):
@@ -538,11 +495,11 @@ class MainMenu:
         input_rect = input_text.get_rect(center=input_bg.center)
         self.screen.blit(input_text, input_rect)
         
-        inst_text = self.font_small.render("Enter 4-character code, then press ENTER", True, (200, 200, 200))
+        inst_text = self.font_small.render("Enter 6-character code, then press ENTER", True, (200, 200, 200))
         inst_rect = inst_text.get_rect(center=(SCREEN_WIDTH//2, 350))
         self.screen.blit(inst_text, inst_rect)
         
-        demo_text = self.font_small.render("LOCL = localhost, other codes = LAN servers", True, (150, 150, 150))
+        demo_text = self.font_small.render("LOCALL = localhost, other codes = LAN servers", True, (150, 150, 150))
         demo_rect = demo_text.get_rect(center=(SCREEN_WIDTH//2, 380))
         self.screen.blit(demo_text, demo_rect)
         
