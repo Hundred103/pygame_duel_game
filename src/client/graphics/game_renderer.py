@@ -93,7 +93,7 @@ class GameRenderer:
             
         from src.config.settings import POINTS_TO_WIN
         progress_text = f"First to {POINTS_TO_WIN} points wins!"
-        progress_surface = self.fonts['small'].render(progress_text, True, WHITE)
+        progress_surface = self.fonts['small'].render(progress_text, True, BLACK)
         progress_pos = (SCREEN_WIDTH//2 - progress_surface.get_width()//2, 50)
         self.screen.blit(progress_surface, progress_pos)
         

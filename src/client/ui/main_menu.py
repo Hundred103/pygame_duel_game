@@ -454,16 +454,25 @@ class MainMenu:
             
             if info.get('ready', False):
                 ready_text = self.font_medium.render("Game Ready! Starting...", True, (0, 255, 0))
-                ready_rect = ready_text.get_rect(center=(SCREEN_WIDTH//2, 380))
+                ready_rect = ready_text.get_rect(center=(SCREEN_WIDTH//2, 370))
                 self.screen.blit(ready_text, ready_rect)
+                
+                # Add the press space instruction below
+                space_text = self.font_small.render("Press SPACE to begin", True, (0, 255, 0))
+                space_rect = space_text.get_rect(center=(SCREEN_WIDTH//2, 400))
+                self.screen.blit(space_text, space_rect)
             elif self.ready_check_pending:
                 ready_text = self.font_medium.render("Checking client readiness...", True, (255, 255, 0))
                 ready_rect = ready_text.get_rect(center=(SCREEN_WIDTH//2, 380))
                 self.screen.blit(ready_text, ready_rect)
             elif info['clients'] >= 2:
-                ready_text = self.font_medium.render("Second player connected! Press SPACE to start", True, (0, 255, 0))
-                ready_rect = ready_text.get_rect(center=(SCREEN_WIDTH//2, 380))
+                ready_text = self.font_medium.render("Second player connected!", True, (0, 255, 0))
+                ready_rect = ready_text.get_rect(center=(SCREEN_WIDTH//2, 370))
                 self.screen.blit(ready_text, ready_rect)
+                
+                space_text = self.font_medium.render("Press SPACE to start game", True, (0, 255, 0))
+                space_rect = space_text.get_rect(center=(SCREEN_WIDTH//2, 400))
+                self.screen.blit(space_text, space_rect)
             else:
                 waiting_text = self.font_medium.render("Waiting for one more player...", True, (200, 200, 200))
                 waiting_rect = waiting_text.get_rect(center=(SCREEN_WIDTH//2, 380))
